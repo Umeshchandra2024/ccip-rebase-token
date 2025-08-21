@@ -37,7 +37,8 @@ contract Vault {
             revert  Vault_DepositAmountIsZero();
         }
         // This call is now valid because the compiler knows i_rebaseToken conforms to IRebaseToken
-        i_rebaseToken.mint(msg.sender, amountToMint);
+        uint256 interestRate = i_rebaseToken.getInterestRate();
+        i_rebaseToken.mint(msg.sender, amountToMint, interestRate);
         emit Deposit(msg.sender, amountToMint);
     }
 
@@ -47,6 +48,9 @@ contract Vault {
      * @dev Follows Checks-Effects-Interactions pattern. Uses low-level .call for ETH transfer.
      */
     function redeem(uint256 _amount) external {
+        if(_amount == type(uint256).max) {
+            _amount = i_rebaseToken.balanceOf(msg.sender);
+        }
         // 1. Effects (State changes occur first)
         // Burn the specified amount of tokens from the caller (msg.sender)
         // The RebaseToken's burn function should handle checks for sufficient balance.
@@ -64,5 +68,9 @@ contract Vault {
         // Emit an event logging the redemption
         emit Redeem(msg.sender, _amount);
 
+    }
+
+    function getRebaseTokenAddress() external view returns(address) {
+        return address(i_rebaseToken);
     }
 }

@@ -6,6 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
+
 /**
      * @title RebaseToken
      * @author UMESH
@@ -17,7 +18,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 contract RebaseToken is ERC20, Ownable, AccessControl {
 
     uint256 private constant PRECISION_FACTOR = 1e18;
-    uint256 private s_interestRate = 5e10;
+    uint256 private s_interestRate = (5 * PRECISION_FACTOR) / 1e8;
     bytes32 public constant MINT_AND_BURN_ROLE = keccak256("MINT_AND_BURN_ROLE");
 
     mapping (address => uint256) private s_userInterestRate; // to store the specific interest rate for locked-in
@@ -44,7 +45,7 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
      */
 
     function setInterestRate(uint256 _newInterestRate) external onlyOwner {
-        if(_newInterestRate > s_interestRate) {
+        if(_newInterestRate >= s_interestRate) {
             revert RebaseToken_InterestRateCanOnlyDecrease(s_interestRate, _newInterestRate);
         }
         s_interestRate = _newInterestRate;
@@ -66,9 +67,9 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
      * @param _to The address to mint tokens to.
      * @param _amount The principal amount of tokens to mint.
      */
-    function mint(address _to, uint256 _amount) external onlyRole(MINT_AND_BURN_ROLE) {
+    function mint(address _to, uint256 _amount, uint256 _userInterestRate) external onlyRole(MINT_AND_BURN_ROLE) {
         _mintAccuredInterest(_to);
-        s_userInterestRate[_to] = s_interestRate;
+        s_userInterestRate[_to] = _userInterestRate;
         _mint(_to, _amount);
     }
 
@@ -79,11 +80,12 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
      * @param _amount The amount of tokens to burn. Use type(uint256).max to burn all tokens.
      */
     function burn(address _from, uint256 _amount) external onlyRole(MINT_AND_BURN_ROLE) {
-        uint256 currentTotalBalance = balanceOf(_from);
+    
 
-        if(_amount == type(uint256).max) {
-            _amount = currentTotalBalance;
-        }
+        // if(_amount == type(uint256).max) {
+        //     _amount = balanceOf(_from);
+        // }
+        // the above we use in the redeem in valut
         // Ensure _amount does not exceed actual balance after potential interest accrual
         // This check is important especially if _amount wasn't type(uint256).max
         // _mintAccruedInterest will update the super.balanceOf(_from)
@@ -204,7 +206,6 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
         linearInterestFactor = PRECISION_FACTOR + fractionalInterest;
         return linearInterestFactor;
     }
-
         /**
      * @dev Internal function to calculate and mint accrued interest for a user.
      * @dev Updates the user's last updated timestamp.
